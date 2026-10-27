@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班級午餐訂餐系統</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & Noto Sans TC -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+            background-color: #f3f4f6;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            body {
+                background-color: white !important;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col justify-between">
+
+    <!-- 頁眉 Header -->
+    <header class="bg-indigo-600 text-white shadow-md no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid font-bold fa-utensils text-2xl text-amber-300"></i>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide">高中班級午餐訂餐系統</h1>
+                    <p class="text-xs text-indigo-200">每日早上統一登記與自動結算工具</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="currentDate" class="bg-indigo-700 text-indigo-100 text-sm px-3 py-1.5 rounded-lg border border-indigo-500/30"></span>
+                <button onclick="resetSystem()" class="bg-indigo-800 hover:bg-indigo-900 text-xs px-3 py-2 rounded-lg transition duration-200 flex items-center gap-1.5 border border-indigo-500/40">
+                    <i class="fa-solid fa-rotate-right"></i> 重置全班訂單
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主內容區 Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+        
+        <!-- 訊息提示 Toast / Alert Box -->
+        <div id="alertBox" class="hidden mb-6 p-4 rounded-xl shadow-sm transition-all duration-300 flex items-start justify-between no-print">
+            <div class="flex items-center space-x-3">
+                <i id="alertIcon" class="text-xl"></i>
+                <span id="alertMessage" class="font-medium text-sm sm:text-base"></span>
+            </div>
+            <button onclick="hideAlert()" class="text-gray-400 hover:text-gray-600 ml-4">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- 第一部分：菜單管理 Banner -->
+        <section class="mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-store text-indigo-600"></i> 今日午餐菜單 (1~5)
+                </h2>
+                <span class="text-xs text-slate-500">點擊菜單卡片可自動填入餐點編號</span>
+            </div>
+            
+            <div id="menuContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+                <!-- 菜單由 JS 動態渲染 -->
+            </div>
+        </section>
+
+        <!-- 網頁主要兩欄布局 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- 左側：訂餐登記表單 (Occupies 5 cols on lg) -->
+            <section class="lg:col-span-5 bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 no-print">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-indigo-600"></i> 訂餐資料登記
+                </h2>
+
+                <form id="orderForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                    <!-- 座號輸入 -->
+                    <div>
+                        <label for="seatNumber" class="block text-sm font-semibold text-slate-700 mb-1">
+                            學生座號 <span class="text-xs font-normal text-slate-500">(1 ~ 50，輸入 0 結算)</span>
+                        </label>
+                        <div class="relative rounded-lg shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-id-card"></i>
+                            </div>
+                            <input type="number" id="seatNumber" min="0" max="50" placeholder="例如：12 (填0即結算)" required
+                                class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 font-medium transition duration-150">
+                        </div>
+                    </div>
+
+                    <!-- 餐點編號輸入 -->
+                    <div>
+                        <label for="itemId" class="block text-sm font-semibold text-slate-700 mb-1">
+                            餐點編號 <span class="text-xs font-normal text-slate-500">(請輸入菜單編號 1 ~ 5)</span>
+                        </label>
+                        <div class="relative rounded-lg shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-bowl-food"></i>
+                            </div>
+                            <input type="number" id="itemId" min="1" max="5" placeholder="例如：1 (排骨便當)"
+                                class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 font-medium transition duration-150">
+                        </div>
+                    </div>
+
+                    <!-- 操作按鈕 -->
+                    <div class="pt-2 flex flex-col sm:flex-row gap-2">
+                        <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm transition duration-200 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> 新增 / 更新單筆
+                        </button>
+                        <button type="button" onclick="finishOrdering()" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm transition duration-200 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-check"></i> 完成結算 (0)
+                        </button>
+                    </div>
+                </form>
+
+                <!-- 快速連續登記模式 Tip -->
+                <div class="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200/60 text-xs text-slate-600 space-y-1.5">
+                    <p class="font-bold text-slate-700 flex items-center gap-1">
+                        <i class="fa-solid fa-lightbulb text-amber-500"></i> 小老師操作小撇步：
+                    </p>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li>新增成功後，座號會自動加 1，方便快速登記下位同學。</li>
+                        <li>若輸入既有座號，系統將覆蓋更新該同學的餐點。</li>
+                        <li>輸入座號 <code class="bg-slate-200 px-1 rounded text-red-600 font-bold">0</code> 按新增，可直接跳轉至結算完成狀態。</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- 右側：訂單明細與結算報表 (Occupies 7 cols on lg) -->
+            <section class="lg:col-span-7 space-y-6">
+                
+                <!-- 統計概覽卡片 -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fa-solid fa-clipboard-list"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-slate-400">總訂餐筆數</p>
+                            <p class="text-2xl font-bold text-slate-800" id="statTotalCount">0 <span class="text-xs font-normal text-slate-500">份</span></p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                            <i class="fa-solid fa-sack-dollar"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-slate-400">全班總金額</p>
+                            <p class="text-2xl font-bold text-emerald-600" id="statTotalAmount">$ 0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 結算彙整報表 (各品項統計) -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-indigo-600"></i> 餐點訂購統計報表
+                        </h3>
+                        <button onclick="window.print()" class="no-print text-xs font-semibold text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition">
+                            <i class="fa-solid fa-print mr-1"></i> 列印報表
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-50/80 text-slate-600 border-b border-slate-100">
+                                    <th class="py-3 px-4 font-semibold">餐點編號與名稱</th>
+                                    <th class="py-3 px-4 font-semibold text-right">單價</th>
+                                    <th class="py-3 px-4 font-semibold text-center">訂購數量</th>
+                                    <th class="py-3 px-4 font-semibold text-right">小計金額</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summaryTableBody" class="divide-y divide-slate-100">
+                                <!-- 彙整數據動態渲染 -->
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-slate-100/70 font-bold text-slate-800">
+                                    <td class="py-3.5 px-4">總計 (Total)</td>
+                                    <td class="py-3.5 px-4 text-right">-</td>
+                                    <td class="py-3.5 px-4 text-center text-indigo-700" id="footerTotalQty">0 份</td>
+                                    <td class="py-3.5 px-4 text-right text-emerald-600 text-base" id="footerTotalSum">$ 0</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 學生個人訂餐詳細清單 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden no-print">
+                    <div class="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-list-ol text-indigo-600"></i> 學生訂餐記錄細項
+                        </h3>
+                        <span class="text-xs text-slate-500" id="recordCountLabel">已登記 0 人</span>
+                    </div>
+
+                    <div class="max-h-80 overflow-y-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead class="sticky top-0 bg-slate-50 text-slate-600 shadow-sm">
+                                <tr>
+                                    <th class="py-3 px-4 font-semibold">座號</th>
+                                    <th class="py-3 px-4 font-semibold">訂購品項</th>
+                                    <th class="py-3 px-4 font-semibold text-right">金額</th>
+                                    <th class="py-3 px-4 font-semibold text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detailTableBody" class="divide-y divide-slate-100">
+                                <!-- 明細數據動態渲染 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+
+    </main>
+
+    <!-- 頁腳 Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-12 py-4 text-center text-xs text-slate-400 no-print">
+        <p>班級午餐訂餐系統 &copy; 2026 高中學生會 / 資訊小組 製作</p>
+    </footer>
+
+    <!-- JavaScript 邏輯控制 -->
+    <script>
+        // 1. 菜單資料結構 (Menu Data)
+        const MENU = [
+            { id: 1, name: '排骨便當', price: 80, icon: 'fa-box' },
+            { id: 2, name: '雞腿便當', price: 85, icon: 'fa-drumstick-bite' },
+            { id: 3, name: '素食便當', price: 70, icon: 'fa-leaf' },
+            { id: 4, name: '滷肉飯', price: 55, icon: 'fa-bowl-rice' },
+            { id: 5, name: '貢丸湯', price: 20, icon: 'fa-mug-hot' }
+        ];
+
+        // 2. 訂單狀態管理 (Order Records Map: key = seat, value = itemId)
+        let ordersMap = new Map();
+
+        // 頁面載入初始化
+        window.onload = function() {
+            // 顯示今日日期
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()} (星期${['日','一','二','三','四','五','六'][today.getDay()]})`;
+            document.getElementById('currentDate').innerText = dateStr;
+
+            renderMenu();
+            updateUI();
+        };
+
+        // 渲染菜單 Banner
+        function renderMenu() {
+            const container = document.getElementById('menuContainer');
+            container.innerHTML = MENU.map(item => `
+                <div onclick="selectMenuId(${item.id})" class="cursor-pointer bg-white p-4 rounded-xl shadow-sm border border-slate-200/70 hover:border-indigo-500 hover:shadow-md transition group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition">
+                            ${item.id}
+                        </span>
+                        <i class="fa-solid ${item.icon} text-slate-400 group-hover:text-indigo-500 transition"></i>
+                    </div>
+                    <div class="font-bold text-slate-800 text-base mb-1">${item.name}</div>
+                    <div class="text-sm font-semibold text-indigo-600">$${item.price}</div>
+                </div>
+            `).join('');
+        }
+
+        // 點擊菜單快捷填入餐點編號
+        function selectMenuId(id) {
+            document.getElementById('itemId').value = id;
+            document.getElementById('seatNumber').focus();
+        }
+
+        // 處理表單提交
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            const seatInput = document.getElementById('seatNumber').value.trim();
+            const itemInput = document.getElementById('itemId').value.trim();
+
+            const seat = parseInt(seatInput, 10);
+
+            // 檢查是否輸入 0 結束結算
+            if (seat === 0) {
+                finishOrdering();
+                return;
+            }
+
+            const itemId = parseInt(itemInput, 10);
+
+            // 輸入驗證 (Input Validation)
+            if (isNaN(seat) || seat < 1 || seat > 50) {
+                showAlert('座號輸入不合法！必須在 1 到 50 號之間。', 'error');
+                return;
+            }
+
+            if (isNaN(itemId) || itemId < 1 || itemId > 5) {
+                showAlert('餐點編號不合法！必須在 1 到 5 號之間。', 'error');
+                return;
+            }
+
+            // 新增或更新訂單
+            const isUpdate = ordersMap.has(seat);
+            ordersMap.set(seat, itemId);
+
+            const menuItem = MENU.find(m => m.id === itemId);
+            if (isUpdate) {
+                showAlert(`已更新座號 [ ${seat} ] 的餐點為：${menuItem.name} ($${menuItem.price})`, 'success');
+            } else {
+                showAlert(`已成功登記 [ ${seat} 號 ] 訂購：${menuItem.name}`, 'success');
+            }
+
+            // 自動將座號 +1 方便小老師連續登記
+            if (seat < 50) {
+                document.getElementById('seatNumber').value = seat + 1;
+            } else {
+                document.getElementById('seatNumber').value = '';
+            }
+            document.getElementById('itemId').value = '';
+
+            updateUI();
+        }
+
+        // 完成訂餐結算
+        function finishOrdering() {
+            if (ordersMap.size === 0) {
+                showAlert('目前尚無任何訂餐資料，無法進行結算！', 'warning');
+                return;
+            }
+            showAlert(`訂餐登記完畢！全班共計訂購 ${ordersMap.size} 份，金額總計 $${calculateTotalAmount()} 元。`, 'info');
+            // 清空輸入框 focus
+            document.getElementById('seatNumber').value = '';
+            document.getElementById('itemId').value = '';
+        }
+
+        // 刪除單筆訂單
+        function removeOrder(seat) {
+            if (ordersMap.has(seat)) {
+                ordersMap.delete(seat);
+                showAlert(`已刪除座號 [ ${seat} ] 的訂餐記錄。`, 'info');
+                updateUI();
+            }
+        }
+
+        // 重置整個系統
+        function resetSystem() {
+            if (ordersMap.size === 0) return;
+            if (confirm('確定要清除全班所有訂餐記錄嗎？此動作無法復原。')) {
+                ordersMap.clear();
+                document.getElementById('seatNumber').value = '';
+                document.getElementById('itemId').value = '';
+                showAlert('已重置全班訂餐資料。', 'info');
+                updateUI();
+            }
+        }
+
+        // 計算總金額
+        function calculateTotalAmount() {
+            let total = 0;
+            ordersMap.forEach((itemId) => {
+                const item = MENU.find(m => m.id === itemId);
+                if (item) total += item.price;
+            });
+            return total;
+        }
+
+        // 更新 UI 報表與明細
+        function updateUI() {
+            // 1. 統計品項數量
+            const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+            ordersMap.forEach((itemId) => {
+                if (counts[itemId] !== undefined) {
+                    counts[itemId]++;
+                }
+            });
+
+            // 2. 渲染結算統計報表 (Summary Table)
+            const summaryTbody = document.getElementById('summaryTableBody');
+            let grandTotalCount = 0;
+            let grandTotalSum = 0;
+
+            summaryTbody.innerHTML = MENU.map(item => {
+                const qty = counts[item.id];
+                const subtotal = qty * item.price;
+                grandTotalCount += qty;
+                grandTotalSum += subtotal;
+
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-3 px-4 flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center justify-center font-bold">${item.id}</span>
+                            <span class="font-medium text-slate-800">${item.name}</span>
+                        </td>
+                        <td class="py-3 px-4 text-right text-slate-600">$${item.price}</td>
+                        <td class="py-3 px-4 text-center font-bold ${qty > 0 ? 'text-indigo-600 bg-indigo-50/50 rounded-lg' : 'text-slate-400'}">${qty}</td>
+                        <td class="py-3 px-4 text-right font-semibold text-slate-800">$${subtotal}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // 更新統計頂部卡片與底部 Footer Total
+            document.getElementById('statTotalCount').innerText = grandTotalCount;
+            document.getElementById('statTotalAmount').innerText = `$ ${grandTotalSum}`;
+            document.getElementById('footerTotalQty').innerText = `${grandTotalCount} 份`;
+            document.getElementById('footerTotalSum').innerText = `$ ${grandTotalSum}`;
+            document.getElementById('recordCountLabel').innerText = `已登記 ${ordersMap.size} 人`;
+
+            // 3. 渲染學生訂餐明細 (Detail Table)
+            const detailTbody = document.getElementById('detailTableBody');
+            if (ordersMap.size === 0) {
+                detailTbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="py-8 text-center text-slate-400">
+                            <i class="fa-solid fa-inbox text-3xl mb-2 block text-slate-300"></i>
+                            尚未登記任何訂餐資料
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // 依照座號升冪排序
+            const sortedSeats = Array.from(ordersMap.keys()).sort((a, b) => a - b);
+            detailTbody.innerHTML = sortedSeats.map(seat => {
+                const itemId = ordersMap.get(seat);
+                const item = MENU.find(m => m.id === itemId);
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-2.5 px-4 font-bold text-indigo-600">${seat} 號</td>
+                        <td class="py-2.5 px-4 font-medium text-slate-800">${item ? item.name : '未知品項'}</td>
+                        <td class="py-2.5 px-4 text-right text-slate-600 font-semibold">$${item ? item.price : 0}</td>
+                        <td class="py-2.5 px-4 text-center">
+                            <button onclick="removeOrder(${seat})" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition" title="刪除此筆">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 提示訊息控制
+        function showAlert(msg, type = 'info') {
+            const box = document.getElementById('alertBox');
+            const icon = document.getElementById('alertIcon');
+            const message = document.getElementById('alertMessage');
+
+            message.innerText = msg;
+            box.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-red-200',
+                               'bg-emerald-50', 'text-emerald-700', 'border-emerald-200',
+                               'bg-amber-50', 'text-amber-700', 'border-amber-200',
+                               'bg-indigo-50', 'text-indigo-700', 'border-indigo-200');
+
+            if (type === 'error') {
+                box.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
+                icon.className = 'fa-solid fa-circle-exclamation text-red-500';
+            } else if (type === 'success') {
+                box.classList.add('bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-200');
+                icon.className = 'fa-solid fa-circle-check text-emerald-500';
+            } else if (type === 'warning') {
+                box.classList.add('bg-amber-50', 'text-amber-700', 'border', 'border-amber-200');
+                icon.className = 'fa-solid fa-triangle-exclamation text-amber-500';
+            } else {
+                box.classList.add('bg-indigo-50', 'text-indigo-700', 'border', 'border-indigo-200');
+                icon.className = 'fa-solid fa-circle-info text-indigo-500';
+            }
+
+            // 自動消退 timer
+            if (window.alertTimer) clearTimeout(window.alertTimer);
+            window.alertTimer = setTimeout(() => {
+                hideAlert();
+            }, 5000);
+        }
+
+        function hideAlert() {
+            document.getElementById('alertBox').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
